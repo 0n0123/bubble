@@ -25,32 +25,28 @@ fn enter_room(room: &str) {
     };
 
     let key = format!("bubble/message/{}", room);
-    
+
     match session.declare_subscriber(key.clone()).res() {
-        Ok(s) => SUBSCRIBER.set(subscriber),
+        Ok(s) => SUBSCRIBER.set(s),
         Err(_) => {
             println!("Failed to declare subscriber: {}", key);
             return;
         }
     };
 
-    match session
-        .declare_publisher(key.clone())
-        .res()
-        {
-            Ok(p) => PUBLISHER
-            .set(publisher),
-            Err(_) => {
-                println!("Failed to declare publisher: {}", key);
-                return;
-            }
-        };
+    match session.declare_publisher(key.clone()).res() {
+        Ok(p) => PUBLISHER.set(p),
+        Err(_) => {
+            println!("Failed to declare publisher: {}", key);
+            return;
+        }
+    };
 
-        println!("Enter: {}", room);
+    println!("Enter: {}", room);
 }
 
 #[tauri::command]
-async fn send_message(room: &str, name: &str, message: &str) {
+fn send_message(room: &str, name: &str, message: &str) {
     println!("{}/{} > {}", room, name, message);
 }
 
