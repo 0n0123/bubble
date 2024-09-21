@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="assets/water.css" />
+    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bubble</title>
+    <script type="module" src="main.js" defer></script>
+  </head>
+  <body>
+    <h3 id="room-id">
+      <span>room0921🚪</span>
+    </h3>
+
+    <div id="messages">
+      <div class="message">
+        <div class="message-head">
+          <label class="message-name">Hoge 123</label>
+          <div class="message-time">09/21 12:04</div>
+        </div>
+        <div class="message-body">こんにちは</div>
+      </div>
+    </div>
+
+    <div id="input">
+      <input id="message" maxlength="400" type="text">
+      <button id="send">Send</button>
+    </div>
+
+    <dialog id="entrance">
+      <div>
+        <label>Room ID</label>
+        <input type="text" id="room-id-input" maxlength="16" pattern="[a-z0-9_¥-]+" list="rooms" placeholder="Select a room or input a new room name.">
+      </div>
+      <div>
+        <label>Your name</label>
+        <input type="text" id="name-input" maxlength="16">
+      </div>
+      <div id="enter-box">
+        <button id="enter">Enter</button>
+      </div>
+    </dialog>
+
+    <datalist id="rooms">
+    </datalist>
+  </body>
+</html>
