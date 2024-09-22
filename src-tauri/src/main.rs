@@ -11,15 +11,19 @@ use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use flume::Receiver;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use zenoh::{prelude::sync::*, publication::Publisher, subscriber::Subscriber};
+
+static SESSION: OnceLock<Session> = OnceLock::new();
+static PUBLISHER: OnceLock<Publisher> = OnceLock::new();
+static APP: OnceLock<AppHandle> = OnceLock::new();
 
 #[tauri::command]
 fn enter_room(room: &str) {
     let session = match SESSION.get() {
         Some(s) => s,
         None => {
-            println!("Session is illegal state.");
+            dbg!("Session is illegal state.");
             return;
         }
     };
@@ -27,36 +31,59 @@ fn enter_room(room: &str) {
     let key = format!("bubble/message/{}", room);
 
     match session.declare_subscriber(key.clone()).res() {
-        Ok(s) => SUBSCRIBER.set(s),
+        Ok(s) => tauri::async_runtime::spawn(listen_message(s)),
         Err(_) => {
-            println!("Failed to declare subscriber: {}", key);
+            dbg!("Failed to declare subscriber", key);
             return;
         }
     };
 
     match session.declare_publisher(key.clone()).res() {
-        Ok(p) => PUBLISHER.set(p),
+        Ok(p) => PUBLISHER.set(p).expect("Failed to fix publisher."),
         Err(_) => {
-            println!("Failed to declare publisher: {}", key);
+            dbg!("Failed to declare publisher", key);
             return;
         }
     };
 
-    println!("Enter: {}", room);
+    dbg!("Enter:", room);
 }
 
 #[tauri::command]
-fn send_message(room: &str, name: &str, message: &str) {
-    println!("{}/{} > {}", room, name, message);
+fn send_message(name: &str, message: &str) {
+    let publisher = match PUBLISHER.get() {
+        Some(p) => p,
+        None => {
+            dbg!("Failed to get publisher.");
+            return;
+        }
+    };
+
+    let mes = Message {
+        name: name.to_owned(),
+        message: message.to_owned(),
+    };
+    let data = rmp_serde::to_vec(&mes).unwrap();
+    if let Err(_) = publisher.put(data).res() {
+        dbg!("Failed to send message", mes);
+    }
 }
 
-static SESSION: OnceLock<Session> = OnceLock::new();
-static SUBSCRIBER: OnceLock<Subscriber<'_, Receiver<Sample>>> = OnceLock::new();
-static PUBLISHER: OnceLock<Publisher> = OnceLock::new();
+async fn listen_message(subscriber: Subscriber<'_, Receiver<Sample>>) {
+    while let Ok(sample) = subscriber.recv() {
+        let read = sample.payload.reader();
+        if let Ok(mes) = rmp_serde::from_read::<_, Message>(read) {
+            if let Some(app) = APP.get() {
+                dbg!("send message", &mes);
+                app.emit_all("message", mes)
+                    .expect("Failed to emit message.");
+            }
+        }
+    }
+}
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct Message {
-    room: String,
     name: String,
     message: String,
 }
@@ -68,11 +95,13 @@ fn main() -> Result<()> {
     }
 
     let config = read_config(&args.config)?;
-    prepare_session(&config.server);
+    prepare_session(config.server)?;
 
     tauri::Builder::default()
         .setup(|app| {
             let app_handle = app.app_handle();
+            APP.set(app_handle)
+                .map_err(|_| anyhow!("Failed to initialize application."))?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![enter_room, send_message])
@@ -85,10 +114,12 @@ fn read_config(path: &Path) -> Result<Config> {
     toml::from_str::<Config>(&config).map_err(|_| anyhow!("Failed to parse config."))
 }
 
-fn prepare_session(server: &str) -> Result<()> {
-    let endpoint = EndPoint::new("tcp", server, "", "")
-        .map_err(|_| anyhow!("Server address cannot be parsed."))?;
-    let config = zenoh::config::client(vec![endpoint]);
+fn prepare_session(servers: Vec<String>) -> Result<()> {
+    let endpoints = servers
+        .iter()
+        .map(|server| EndPoint::new("tcp", server, "", ""))
+        .filter_map(|r| r.ok());
+    let config = zenoh::config::client(endpoints);
     let session = zenoh::open(config)
         .res()
         .map_err(|_| anyhow!("Failed to open zenoh session."))?;
@@ -108,5 +139,5 @@ struct Args {
 
 #[derive(Deserialize)]
 struct Config {
-    server: String,
+    server: Vec<String>,
 }

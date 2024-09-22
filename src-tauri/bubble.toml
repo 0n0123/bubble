@@ -1,1 +1,3 @@
-server = "localhost:7447"
+server = [
+    "localhost:7447"
+]

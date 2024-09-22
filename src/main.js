@@ -1,32 +1,34 @@
 const { invoke } = window.__TAURI__.tauri;
+const { listen } = window.__TAURI__.event;
 
 const roomName = document.querySelector('#room-id');
 const entranceDialog = document.querySelector('dialog#entrance');
 const roomIdInput = document.querySelector('input#room-id-input');
 const nameInput = document.querySelector('input#name-input');
 const enterButton = document.querySelector('button#enter');
+const messageContainer = document.querySelector('div#messages');
 const messageInput = document.querySelector('input#message');
 const sendButton = document.querySelector('button#send');
 
-const info = {
-  room: '',
-  name: '',
-};
+let userName = '';
 
 async function sendMessage(message) {
   await invoke("send_message", { 
-    name: info.name,
-    room: info.room,
+    name: userName,
     message
   });
+  messageInput.value = '';
 }
 
 window.addEventListener("DOMContentLoaded", () => {
   //entranceDialog.show();
-  enterButton.onclick = e => {
-    info.room = roomIdInput.value.trim();
-    info.name = nameInput.value.trim();
-    roomName.textContent = info.room;
+  enterButton.onclick = async e => {
+    userName = nameInput.value.trim();
+    const roomId = roomIdInput.value.trim();
+
+    await enterRoom(roomId, userName);
+
+    roomName.textContent = roomId;
     //entranceDialog.hide();
     entranceDialog.style.display = 'none';
   };
@@ -36,3 +38,37 @@ window.addEventListener("DOMContentLoaded", () => {
     sendMessage(message);
   };
 });
+
+async function enterRoom(room, name) {
+  invoke('enter_room', {
+    room,
+    name
+  });
+}
+
+
+listen('message', event => {
+  const message = event.payload;
+  const date = new Date();
+  const datetime = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes()}`;
+  const html = createMessageHTML(message.name, message.message, datetime);
+  messageContainer.insertAdjacentHTML('afterbegin', html);
+  purgeMessage();
+});
+
+function createMessageHTML(name, message, datetime) {
+  return `<div class="message">
+    <div class="message-head">
+      <label class="message-name">${name}</label>
+      <div class="message-time">${datetime}</div>
+    </div>
+    <div class="message-body">${message}</div>
+  </div>`;
+}
+
+function purgeMessage() {
+  const messages = Array.from(document.querySelectorAll('.message'));
+  if (messages.length >= 100) {
+    messages.slice(100).forEach(el => el.remove());
+  }
+}
