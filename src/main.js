@@ -24,7 +24,7 @@ async function sendMessage(message) {
 window.addEventListener('DOMContentLoaded', async () => {
   await invoke('hello', {});
 
-  //entranceDialog.show();
+  entranceDialog.show();
   enterButton.onclick = async e => {
     userName = nameInput.value.trim();
     const roomId = roomIdInput.value.trim();
@@ -32,8 +32,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await enterRoom(roomId, userName);
 
     roomName.textContent = roomId;
-    //entranceDialog.hide();
-    entranceDialog.style.display = 'none';
+    entranceDialog.hide();
   };
 
   sendButton.onclick = e => {
@@ -52,7 +51,7 @@ async function enterRoom(room, name) {
 listen('rooms', event => {
   const roomIds = event.payload;
   for (const roomId of roomIds) {
-    roomIdList.insertAdjacentHTML('beforeend', `<option value="${roomId}">${roomId}</option>`);
+    roomIdList.insertAdjacentHTML('beforeend', `<option value="${roomId}"></option>`);
   }
 });
 

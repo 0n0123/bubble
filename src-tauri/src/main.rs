@@ -30,6 +30,7 @@ fn hello() {
                         room_ids.insert(id);
                     }
                 }
+                dbg!("Room IDs", &room_ids);
             }
             let _ = app_handle.emit_all("rooms", room_ids);
         }
