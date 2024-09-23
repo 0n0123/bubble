@@ -1,6 +1,7 @@
 const { invoke } = window.__TAURI__.tauri;
 const { listen } = window.__TAURI__.event;
 
+const roomIdList = document.querySelector('#room-ids');
 const roomName = document.querySelector('#room-id');
 const entranceDialog = document.querySelector('dialog#entrance');
 const roomIdInput = document.querySelector('input#room-id-input');
@@ -13,14 +14,16 @@ const sendButton = document.querySelector('button#send');
 let userName = '';
 
 async function sendMessage(message) {
-  await invoke("send_message", { 
+  await invoke('send_message', { 
     name: userName,
     message
   });
   messageInput.value = '';
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  await invoke('hello', {});
+
   //entranceDialog.show();
   enterButton.onclick = async e => {
     userName = nameInput.value.trim();
@@ -46,6 +49,12 @@ async function enterRoom(room, name) {
   });
 }
 
+listen('rooms', event => {
+  const roomIds = event.payload;
+  for (const roomId of roomIds) {
+    roomIdList.insertAdjacentHTML('beforeend', `<option value="${roomId}">${roomId}</option>`);
+  }
+});
 
 listen('message', event => {
   const message = event.payload;

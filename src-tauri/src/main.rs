@@ -1,22 +1,40 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
+use std::{collections::HashSet, sync::OnceLock};
 
 use anyhow::{anyhow, bail, Result};
-use clap::Parser;
+use cli::Args;
 use flume::Receiver;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use zenoh::{prelude::sync::*, publication::Publisher, subscriber::Subscriber};
 
+mod cli;
+mod conf;
+
 static SESSION: OnceLock<Session> = OnceLock::new();
 static PUBLISHER: OnceLock<Publisher> = OnceLock::new();
 static APP: OnceLock<AppHandle> = OnceLock::new();
+
+#[tauri::command]
+fn hello() {
+    let app_handle = APP.get();
+    let session = SESSION.get();
+    if let (Some(app_handle), Some(session)) = (app_handle, session) {
+        if let Ok(replies) = session.get("bubble/rooms").res() {
+            let mut room_ids = HashSet::new();
+            while let Ok(reply) = replies.recv() {
+                for c in reply.sample.unwrap().payload.slices() {
+                    if let Ok(id) = String::from_utf8(c.to_vec()) {
+                        room_ids.insert(id);
+                    }
+                }
+            }
+            let _ = app_handle.emit_all("rooms", room_ids);
+        }
+    }
+}
 
 #[tauri::command]
 fn enter_room(room: &str) {
@@ -45,6 +63,25 @@ fn enter_room(room: &str) {
             return;
         }
     };
+
+    let room_query = match session.declare_queryable("bubble/rooms").res() {
+        Ok(q) => q,
+        Err(_) => {
+            dbg!("Failed to declare queryable.");
+            return;
+        }
+    };
+    let room_id = room.to_owned();
+    tauri::async_runtime::spawn(async move {
+        while let Ok(query) = room_query.recv() {
+            query
+                .reply(Ok(
+                    Sample::try_from("bubble/rooms", room_id.to_owned()).unwrap()
+                ))
+                .res()
+                .unwrap();
+        }
+    });
 
     dbg!("Enter:", room);
 }
@@ -89,12 +126,12 @@ struct Message {
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    let args = Args::load();
     if !args.config.exists() {
         bail!("Failed to read config.")
     }
 
-    let config = read_config(&args.config)?;
+    let config = conf::Config::read(&args.config)?;
     prepare_session(config.server)?;
 
     tauri::Builder::default()
@@ -104,14 +141,9 @@ fn main() -> Result<()> {
                 .map_err(|_| anyhow!("Failed to initialize application."))?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![enter_room, send_message])
+        .invoke_handler(tauri::generate_handler![hello, enter_room, send_message])
         .run(tauri::generate_context!())
         .map_err(|_| anyhow!("error while running tauri application"))
-}
-
-fn read_config(path: &Path) -> Result<Config> {
-    let config = fs::read_to_string(path)?;
-    toml::from_str::<Config>(&config).map_err(|_| anyhow!("Failed to parse config."))
 }
 
 fn prepare_session(servers: Vec<String>) -> Result<()> {
@@ -129,15 +161,4 @@ fn prepare_session(servers: Vec<String>) -> Result<()> {
         .map_err(|_| anyhow!("Failed to fix zenoh session."))?;
 
     Ok(())
-}
-
-#[derive(Parser)]
-struct Args {
-    #[clap(default_value = "./bubble.toml")]
-    config: PathBuf,
-}
-
-#[derive(Deserialize)]
-struct Config {
-    server: Vec<String>,
 }
