@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bubble</title>
-    <script type="module" src="main.js" defer></script>
   </head>
   <body>
     <h3 id="room-id">
@@ -16,25 +15,36 @@
     </div>
 
     <div id="input">
-      <input id="message" maxlength="400" type="text">
+      <input id="message" maxlength="400" type="text" placeholder="Input message">
       <button id="send">Send</button>
     </div>
 
     <dialog id="entrance">
       <div>
+        <label>Server IP</label>
+        <input type="text" id="server-input" maxlength="20" pattern="[a-z0-9.:]+" placeholder="127.0.0.1:7447">
+      </div>
+      <div>
         <label>Room ID</label>
-        <input type="text" id="room-id-input" maxlength="16" pattern="[a-z0-9_¥-]+" list="rooms" placeholder="Select a room or input a new room name.">
+        <input type="text" id="room-id-input" maxlength="16" pattern="[a-z0-9_¥-]+" list="rooms" placeholder="saloon">
       </div>
       <div>
         <label>Your name</label>
-        <input type="text" id="name-input" maxlength="16">
+        <input type="text" id="name-input" maxlength="16" minlength="3" pattern="[a-zA-Z0-9_¥-.]+">
       </div>
-      <div id="enter-box">
-        <button id="enter">Enter</button>
+      <div class="controls">
+        <button id="enter" disabled>Enter</button>
       </div>
     </dialog>
 
-    <datalist id="room-ids">
-    </datalist>
+    <dialog id="notice">
+      <div id="notice-icon"></div>
+      <div id="notice-message"></div>
+      <div class="controls">
+        <button id="notice-close">OK</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="main.js" defer></script>
   </body>
 </html>

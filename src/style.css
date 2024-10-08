@@ -67,6 +67,7 @@ dialog {
     left: 50%;
     transform: translate(-50%, -50%);
     width: 20em;
+    margin: 0;
 }
 
 dialog input {
@@ -80,8 +81,25 @@ dialog::backdrop {
     pointer-events: none;
 }
 
-#enter-box {
+.controls {
     display: flex;
     flex-direction: row;
     justify-content: center;
+}
+
+#notice-icon {
+    font-size: 32px;
+    font-weight: bold;
+}
+
+#notice-icon.info {
+    color: skyblue;
+}
+
+#notice-icon.warn {
+    color: orange;
+}
+
+#notice-icon.error {
+    color: crimson;
 }
