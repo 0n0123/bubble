@@ -1,4 +1,4 @@
-const { invoke } = window.__TAURI__.tauri;
+const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const roomName = document.getElementById('room-id');
@@ -6,7 +6,6 @@ const roomName = document.getElementById('room-id');
 const entranceDialog = new class {
   /** @type {HTMLDialogElement} */
   #dialog = document.getElementById('entrance');
-  #server = document.getElementById('server-input');
   #room = document.getElementById('room-id-input');
   #roomIds = document.getElementById('room-ids');
   #name = document.getElementById('name-input');
@@ -22,15 +21,14 @@ const entranceDialog = new class {
     };
 
     this.#enter.onclick = async e => {
-      const serverIp = this.#server.value.trim() || this.#server.placeholder;
       const roomId = this.#room.value.trim() || this.#room.placeholder;
       userName = this.#name.value.trim();
       if (!this.#name.checkValidity()) {
         this.#name.reportValidity();
         return;
       }
-      await enterRoom(serverIp, roomId, userName);
-      roomName.textContent = `${serverIp} / ${roomId}`;
+      await enterRoom(roomId, userName);
+      roomName.textContent = roomId;
       this.close();
     };
   }
@@ -121,9 +119,8 @@ async function sendMessage(message) {
   messageInput.value = '';
 }
 
-async function enterRoom(server, room, name) {
+async function enterRoom(room, name) {
   invoke('enter_room', {
-    server,
     room,
     name
   });
