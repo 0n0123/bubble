@@ -6,6 +6,7 @@ const roomName = document.getElementById('room-id');
 const entranceDialog = new class {
   /** @type {HTMLDialogElement} */
   #dialog = document.getElementById('entrance');
+  #serverIp = document.getElementById('server-ip-input');
   #room = document.getElementById('room-id-input');
   #roomIds = document.getElementById('room-ids');
   #name = document.getElementById('name-input');
@@ -21,13 +22,14 @@ const entranceDialog = new class {
     };
 
     this.#enter.onclick = async e => {
+      const serverIp = this.#serverIp.value.trim() || this.#serverIp.placeholder;
       const roomId = this.#room.value.trim() || this.#room.placeholder;
       userName = this.#name.value.trim();
       if (!this.#name.checkValidity()) {
         this.#name.reportValidity();
         return;
       }
-      await enterRoom(roomId, userName);
+      await enterRoom({ serverIp, roomId, userName });
       roomName.textContent = roomId;
       this.close();
     };
@@ -119,11 +121,8 @@ async function sendMessage(message) {
   messageInput.value = '';
 }
 
-async function enterRoom(room, name) {
-  invoke('enter_room', {
-    room,
-    name
-  });
+async function enterRoom(roomInfo) {
+  return invoke('enter_room', roomInfo);
 }
 
 

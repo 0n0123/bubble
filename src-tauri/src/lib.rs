@@ -16,11 +16,6 @@ static APP: OnceLock<AppHandle> = OnceLock::new();
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
-    if let Err(e) = prepare_session().await {
-        eprintln!("{e}");
-        return;
-    };
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
@@ -37,31 +32,34 @@ pub async fn run() {
 static SESSION: OnceLock<Session> = OnceLock::new();
 static PUBLISHER: OnceLock<Publisher> = OnceLock::new();
 
-async fn prepare_session() -> Result<()> {
+async fn prepare_session(server_ip: &str) -> Result<()> {
+    let config = format!(r#"{{
+        mode: "client",
+        connect: {{
+            endpoints: ["tcp/{server_ip}"]
+        }}
+    }}
+    "#);
     let config =
-        zenoh::Config::from_file("./zenoh.json5").map_err(|_| "Cannot read zenoh.json5.")?;
+        zenoh::Config::from_json5(&config).map_err(|_| "Cannot configure Zenoh.")?;
     let session = zenoh::open(config)
         .await
         .map_err(|_| "Failed to open zenoh session.")?;
 
-    SESSION
-        .set(session)
-        .map_err(|_| "Failed to fix zenoh session.")?;
+    SESSION.set(session).unwrap();
 
     Ok(())
 }
 
 #[tauri::command]
-async fn enter_room(room: &str) -> Result<()> {
-    let session = match SESSION.get() {
-        Some(s) => s,
-        None => {
-            Notice::new("Cannot connect to server.").notify();
-            return Err("Session is illegal state.");
-        }
-    };
+async fn enter_room(server_ip: &str, room_id: &str, user_name: &str) -> Result<()> {
+    if let Err(e) = prepare_session(server_ip).await {
+        Notice::new(e).notify();
+        return Err("Cannot connect to server.");
+    }
+    let session = SESSION.get().unwrap();
 
-    let key = format!("bubble/message/{}", room);
+    let key = format!("bubble/message/{}", room_id);
 
     let mes_sub = session
         .declare_subscriber(key.clone())
@@ -75,7 +73,7 @@ async fn enter_room(room: &str) -> Result<()> {
         .map_err(|_| "Cannot declare publisher.")?;
     PUBLISHER.set(mes_pub).expect("Failed to fix publisher.");
 
-    println!("Enter: {room}");
+    println!("Enter: {}", room_id);
 
     Ok(())
 }
